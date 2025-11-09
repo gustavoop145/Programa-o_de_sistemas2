@@ -1,0 +1,9 @@
+{
+  "titulo": "Estágio em Desenvolvimento Java",
+  "descricao": "Atuar no backend com Spring Boot.",
+  "localizacao": "Remoto",
+  "modalidade": "REMOTO",
+  "requisitos": "Java, Spring Boot, PostgreSQL",
+  "carga_horaria": 30,
+  "status": "ABERTA"
+}
