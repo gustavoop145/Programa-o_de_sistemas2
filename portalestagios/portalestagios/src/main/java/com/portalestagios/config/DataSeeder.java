@@ -27,6 +27,7 @@ public class DataSeeder {
 
       usuarios.findByEmailIgnoreCase("admin@portal.com").orElseGet(() ->
           usuarios.save(Usuario.builder()
+              .nome("Administrador") // <-- necessário (NOT NULL)
               .email("admin@portal.com")
               .senhaHash(encoder.encode("admin123"))
               .roles(Set.of("ROLE_ADMIN"))

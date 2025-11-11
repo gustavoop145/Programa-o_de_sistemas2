@@ -5,11 +5,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -19,76 +21,93 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
-@EnableMethodSecurity(prePostEnabled = true) // habilita @PreAuthorize nos controllers
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
   private final JwtAuthFilter jwtAuthFilter;
+  private final UserDetailsService userDetailsService;
 
-  public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
-    this.jwtAuthFilter = jwtAuthFilter; // mesmo pacote (config)
+  public SecurityConfig(JwtAuthFilter jwtAuthFilter, UserDetailsService userDetailsService) {
+    this.jwtAuthFilter = jwtAuthFilter;
+    this.userDetailsService = userDetailsService;
+  }
+
+  private static final String[] SWAGGER_WHITELIST = {
+      "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**", "/api-docs/**"
+  };
+
+  private static final String[] PUBLIC_ENDPOINTS = {
+      "/auth/**", "/h2-console/**", "/error", "/actuator/health"
+  };
+
+  @Bean
+  public DaoAuthenticationProvider daoAuthenticationProvider(PasswordEncoder encoder) {
+    DaoAuthenticationProvider p = new DaoAuthenticationProvider();
+    p.setUserDetailsService(userDetailsService);
+    p.setPasswordEncoder(encoder);
+    return p;
   }
 
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http
-      .csrf(csrf -> csrf.disable())
-      .cors(Customizer.withDefaults()) // habilita o CORS com o bean abaixo
+      // CSRF liberado para swagger/h2/auth
+      .csrf(csrf -> csrf
+          .ignoringRequestMatchers(SWAGGER_WHITELIST)
+          .ignoringRequestMatchers(PUBLIC_ENDPOINTS)
+      )
+      // necessário para H2 console
+      .headers(h -> h.frameOptions(f -> f.disable()))
+      .cors(Customizer.withDefaults())
       .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
       .authorizeHttpRequests(auth -> auth
-        // Preflight CORS
-        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+          // preflight CORS
+          .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-        // Públicos (auth + swagger + error)
-        .requestMatchers("/auth/**").permitAll()
-        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/api-docs/**").permitAll()
-        .requestMatchers("/error").permitAll()
+          // públicos
+          .requestMatchers(SWAGGER_WHITELIST).permitAll()
+          .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
 
-        // Vagas
-        .requestMatchers(HttpMethod.GET, "/api/vagas/**").permitAll()
-        .requestMatchers(HttpMethod.POST, "/api/vagas/**").hasAnyRole("EMPRESA","ADMIN")
-        .requestMatchers(HttpMethod.PUT,  "/api/vagas/**").hasAnyRole("EMPRESA","ADMIN")
-        .requestMatchers(HttpMethod.POST, "/api/vagas/*/encerrar").hasAnyRole("EMPRESA","ADMIN")
+          // Áreas de interesse: listar é público; demais operações só ADMIN
+          .requestMatchers(HttpMethod.GET, "/api/areas/**").permitAll()
+          .requestMatchers("/api/areas/**").hasRole("ADMIN")
 
-        // Áreas de interesse (somente ADMIN)
-        .requestMatchers("/api/areas/**").hasRole("ADMIN")
+          // Vagas
+          .requestMatchers(HttpMethod.GET, "/api/vagas/**").permitAll()
+          .requestMatchers(HttpMethod.POST, "/api/vagas/**").hasAnyRole("EMPRESA","ADMIN")
+          .requestMatchers(HttpMethod.PUT,  "/api/vagas/**").hasAnyRole("EMPRESA","ADMIN")
+          .requestMatchers(HttpMethod.POST, "/api/vagas/*/encerrar").hasAnyRole("EMPRESA","ADMIN")
 
-        // Estudantes
-        .requestMatchers(HttpMethod.POST, "/api/estudantes").permitAll() // auto-cadastro (opcional)
-        // Demais endpoints de estudante controlados via @PreAuthorize
+          // Estudantes
+          .requestMatchers(HttpMethod.POST, "/api/estudantes").permitAll()
 
-        // Empresas
-        .requestMatchers("/api/empresas/me/**").hasRole("EMPRESA") // painel da própria empresa
-        .requestMatchers("/api/empresas/**").hasRole("ADMIN")      // manutenção de empresas pelo admin
+          // Empresas
+          .requestMatchers("/api/empresas/me/**").hasRole("EMPRESA")
+          .requestMatchers("/api/empresas/**").hasRole("ADMIN")
 
-        // Admin
-        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+          // Admin
+          .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-        // Qualquer outra rota precisa estar autenticada
-        .anyRequest().authenticated()
+          // demais rotas
+          .anyRequest().authenticated()
       )
+      .authenticationProvider(daoAuthenticationProvider(passwordEncoder()))
       .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
   }
 
-  // Bean CORS: ajuste as origens conforme sua SPA (dev/prod)
+  // DEV: libera *todos* os origins com wildcard e SEM credenciais.
+  // Em produção, troque para uma lista específica e setAllowCredentials(true) se precisar.
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration c = new CorsConfiguration();
-
-    // Em desenvolvimento (Vite)
-    c.setAllowedOrigins(java.util.List.of(
-      "http://localhost:5173",
-      "https://SEU-DOMINIO-NA-VERCEL.app" // TODO: troque para o domínio real de produção
-    ));
-    // Se precisar wildcard:
-    // c.setAllowedOriginPatterns(java.util.List.of("https://*.seu-dominio.com"));
-
+    c.setAllowedOriginPatterns(java.util.List.of("*")); // wildcard
+    c.setAllowCredentials(false); // obrigatório com wildcard
     c.setAllowedMethods(java.util.List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
     c.setAllowedHeaders(java.util.List.of("*"));
-    c.setExposedHeaders(java.util.List.of("Authorization")); // SPA pode ler o header Authorization, se necessário
-    c.setAllowCredentials(true); // se for usar cookies/withCredentials
-    c.setMaxAge(3600L); // cache do preflight (1h)
+    c.setExposedHeaders(java.util.List.of("Authorization"));
+    c.setMaxAge(3600L);
 
     UrlBasedCorsConfigurationSource src = new UrlBasedCorsConfigurationSource();
     src.registerCorsConfiguration("/**", c);
@@ -101,7 +120,7 @@ public class SecurityConfig {
   }
 
   @Bean
-  public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
-    return configuration.getAuthenticationManager();
+  public AuthenticationManager authenticationManager(AuthenticationConfiguration cfg) throws Exception {
+    return cfg.getAuthenticationManager();
   }
 }

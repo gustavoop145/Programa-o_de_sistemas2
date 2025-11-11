@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -18,16 +19,18 @@ public interface InscricaoRepository extends JpaRepository<Inscricao, Long> {
     List<Inscricao> findByVaga_Id(Long vagaId);
     boolean existsByEstudanteAndVaga(Estudante estudante, Vaga vaga);
 
-    // ===== Painel da empresa =====
-    // Todas as inscrições em vagas pertencentes a uma empresa
-    @Query("select i from Inscricao i where i.vaga.empresa.id = :empresaId")
-    List<Inscricao> findByEmpresaId(Long empresaId);
+    // ===== Painel da empresa (derivados) =====
+    List<Inscricao> findByVaga_Empresa_Id(Long empresaId);
+    Page<Inscricao> findByVaga_Empresa_Id(Long empresaId, Pageable pageable);
 
-    // (Opcional) mesma consulta com paginação
+    // ===== Aliases para compatibilidade com controllers antigos =====
     @Query("select i from Inscricao i where i.vaga.empresa.id = :empresaId")
-    Page<Inscricao> findByEmpresaId(Long empresaId, Pageable pageable);
+    List<Inscricao> findByEmpresaId(@Param("empresaId") Long empresaId);
 
-    // ===== Extras úteis (opcionais) =====
+    @Query("select i from Inscricao i where i.vaga.empresa.id = :empresaId")
+    Page<Inscricao> findByEmpresaId(@Param("empresaId") Long empresaId, Pageable pageable);
+
+    // Extras
     long countByVaga_Id(Long vagaId);
     long countByEstudante_Id(Long estudanteId);
 }
