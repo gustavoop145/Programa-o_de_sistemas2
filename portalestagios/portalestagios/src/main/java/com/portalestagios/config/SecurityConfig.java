@@ -10,6 +10,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -51,13 +52,12 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http
-      // CSRF liberado para swagger/h2/auth
-      .csrf(csrf -> csrf
-          .ignoringRequestMatchers(SWAGGER_WHITELIST)
-          .ignoringRequestMatchers(PUBLIC_ENDPOINTS)
-      )
+      // API stateless com JWT → CSRF off
+      .csrf(AbstractHttpConfigurer::disable)
+
       // necessário para H2 console
       .headers(h -> h.frameOptions(f -> f.disable()))
+
       .cors(Customizer.withDefaults())
       .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
       .authorizeHttpRequests(auth -> auth
@@ -68,15 +68,17 @@ public class SecurityConfig {
           .requestMatchers(SWAGGER_WHITELIST).permitAll()
           .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
 
-          // Áreas de interesse: listar é público; demais operações só ADMIN
-          .requestMatchers(HttpMethod.GET, "/api/areas/**").permitAll()
-          .requestMatchers("/api/areas/**").hasRole("ADMIN")
+          // rota de diagnóstico do usuário logado (só precisa estar autenticado)
+          .requestMatchers(HttpMethod.GET, "/api/users/me").authenticated()
 
           // Vagas
-          .requestMatchers(HttpMethod.GET, "/api/vagas/**").permitAll()
+          .requestMatchers(HttpMethod.GET,  "/api/vagas/**").permitAll()
           .requestMatchers(HttpMethod.POST, "/api/vagas/**").hasAnyRole("EMPRESA","ADMIN")
           .requestMatchers(HttpMethod.PUT,  "/api/vagas/**").hasAnyRole("EMPRESA","ADMIN")
           .requestMatchers(HttpMethod.POST, "/api/vagas/*/encerrar").hasAnyRole("EMPRESA","ADMIN")
+
+          // Áreas de interesse (somente ADMIN para qualquer operação)
+          .requestMatchers("/api/areas/**").hasRole("ADMIN")
 
           // Estudantes
           .requestMatchers(HttpMethod.POST, "/api/estudantes").permitAll()
@@ -97,13 +99,12 @@ public class SecurityConfig {
     return http.build();
   }
 
-  // DEV: libera *todos* os origins com wildcard e SEM credenciais.
-  // Em produção, troque para uma lista específica e setAllowCredentials(true) se precisar.
+  // CORS amplo em dev (ajuste para produção)
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration c = new CorsConfiguration();
-    c.setAllowedOriginPatterns(java.util.List.of("*")); // wildcard
-    c.setAllowCredentials(false); // obrigatório com wildcard
+    c.setAllowedOriginPatterns(java.util.List.of("*"));
+    c.setAllowCredentials(false); // wildcard + sem credenciais
     c.setAllowedMethods(java.util.List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
     c.setAllowedHeaders(java.util.List.of("*"));
     c.setExposedHeaders(java.util.List.of("Authorization"));
@@ -115,9 +116,7 @@ public class SecurityConfig {
   }
 
   @Bean
-  public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-  }
+  public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
 
   @Bean
   public AuthenticationManager authenticationManager(AuthenticationConfiguration cfg) throws Exception {

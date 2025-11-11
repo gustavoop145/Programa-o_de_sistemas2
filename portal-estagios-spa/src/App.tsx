@@ -16,9 +16,30 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Protected><EstudanteHome /></Protected>} />
-            <Route path="/empresa" element={<Protected role="ROLE_EMPRESA"><EmpresaHome /></Protected>} />
-            <Route path="/admin" element={<Protected role="ROLE_ADMIN"><AdminDashboard /></Protected>} />
+            <Route
+              path="/"
+              element={
+                <Protected>
+                  <EstudanteHome />
+                </Protected>
+              }
+            />
+            <Route
+              path="/empresa"
+              element={
+                <Protected role="ROLE_EMPRESA">
+                  <EmpresaHome />
+                </Protected>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <Protected role="ROLE_ADMIN">
+                  <AdminDashboard />
+                </Protected>
+              }
+            />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
