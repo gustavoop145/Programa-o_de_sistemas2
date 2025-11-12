@@ -34,11 +34,19 @@ public class SecurityConfig {
   }
 
   private static final String[] SWAGGER_WHITELIST = {
-      "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**", "/api-docs/**"
+      "/v3/api-docs/**",
+      "/swagger-ui.html",
+      "/swagger-ui/**",
+      "/api-docs/**"
   };
 
+  // Rotas públicas (inclui /auth/** e /api/auth/**)
   private static final String[] PUBLIC_ENDPOINTS = {
-      "/auth/**", "/h2-console/**", "/error", "/actuator/health"
+      "/auth/**",
+      "/api/auth/**",
+      "/h2-console/**",
+      "/error",
+      "/actuator/health"
   };
 
   @Bean
@@ -52,59 +60,60 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http
-      // API stateless com JWT → CSRF off
-      .csrf(AbstractHttpConfigurer::disable)
+        // API stateless com JWT
+        .csrf(AbstractHttpConfigurer::disable)
+        .headers(h -> h.frameOptions(f -> f.disable())) // para H2 console
 
-      // necessário para H2 console
-      .headers(h -> h.frameOptions(f -> f.disable()))
+        .cors(Customizer.withDefaults())
+        .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-      .cors(Customizer.withDefaults())
-      .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-      .authorizeHttpRequests(auth -> auth
-          // preflight CORS
-          .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+        .authorizeHttpRequests(auth -> auth
+            // Preflight CORS
+            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-          // públicos
-          .requestMatchers(SWAGGER_WHITELIST).permitAll()
-          .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+            // Públicos
+            .requestMatchers(SWAGGER_WHITELIST).permitAll()
+            .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
 
-          // rota de diagnóstico do usuário logado (só precisa estar autenticado)
-          .requestMatchers(HttpMethod.GET, "/api/users/me").authenticated()
+            // Rota de diagnóstico do usuário logado
+            .requestMatchers(HttpMethod.GET, "/api/users/me").authenticated()
 
-          // Vagas
-          .requestMatchers(HttpMethod.GET,  "/api/vagas/**").permitAll()
-          .requestMatchers(HttpMethod.POST, "/api/vagas/**").hasAnyRole("EMPRESA","ADMIN")
-          .requestMatchers(HttpMethod.PUT,  "/api/vagas/**").hasAnyRole("EMPRESA","ADMIN")
-          .requestMatchers(HttpMethod.POST, "/api/vagas/*/encerrar").hasAnyRole("EMPRESA","ADMIN")
+            // Vagas
+            .requestMatchers(HttpMethod.GET,  "/api/vagas/**").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/vagas/**").hasAnyRole("EMPRESA","ADMIN")
+            .requestMatchers(HttpMethod.PUT,  "/api/vagas/**").hasAnyRole("EMPRESA","ADMIN")
+            // Encerrar vaga: PATCH e pattern com subcaminho
+            .requestMatchers(HttpMethod.PATCH, "/api/vagas/**/encerrar").hasAnyRole("EMPRESA","ADMIN")
 
-          // Áreas de interesse (somente ADMIN para qualquer operação)
-          .requestMatchers("/api/areas/**").hasRole("ADMIN")
+            // Áreas de interesse (apenas ADMIN)
+            .requestMatchers("/api/areas/**").hasRole("ADMIN")
 
-          // Estudantes
-          .requestMatchers(HttpMethod.POST, "/api/estudantes").permitAll()
+            // Estudantes
+            .requestMatchers(HttpMethod.POST, "/api/estudantes").permitAll()
 
-          // Empresas
-          .requestMatchers("/api/empresas/me/**").hasRole("EMPRESA")
-          .requestMatchers("/api/empresas/**").hasRole("ADMIN")
+            // Empresas
+            .requestMatchers("/api/empresas/me/**").hasRole("EMPRESA")
+            .requestMatchers("/api/empresas/**").hasRole("ADMIN")
 
-          // Admin
-          .requestMatchers("/api/admin/**").hasRole("ADMIN")
+            // Admin
+            .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-          // demais rotas
-          .anyRequest().authenticated()
-      )
-      .authenticationProvider(daoAuthenticationProvider(passwordEncoder()))
-      .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            // Qualquer outra rota exige autenticação
+            .anyRequest().authenticated()
+        )
+
+        .authenticationProvider(daoAuthenticationProvider(passwordEncoder()))
+        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
   }
 
-  // CORS amplo em dev (ajuste para produção)
+  // CORS amplo para desenvolvimento (ajuste para produção)
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration c = new CorsConfiguration();
     c.setAllowedOriginPatterns(java.util.List.of("*"));
-    c.setAllowCredentials(false); // wildcard + sem credenciais
+    c.setAllowCredentials(false);
     c.setAllowedMethods(java.util.List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
     c.setAllowedHeaders(java.util.List.of("*"));
     c.setExposedHeaders(java.util.List.of("Authorization"));
@@ -116,7 +125,9 @@ public class SecurityConfig {
   }
 
   @Bean
-  public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
 
   @Bean
   public AuthenticationManager authenticationManager(AuthenticationConfiguration cfg) throws Exception {

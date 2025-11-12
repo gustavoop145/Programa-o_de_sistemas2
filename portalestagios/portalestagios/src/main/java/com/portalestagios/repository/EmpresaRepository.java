@@ -8,9 +8,13 @@ import java.util.Optional;
 
 public interface EmpresaRepository extends JpaRepository<Empresa, Long> {
 
-    // usado no login e painel da empresa
+    // usado pelo /api/users/me e também em fluxos de autenticação
     Optional<Empresa> findByEmailIgnoreCase(String email);
 
-    // opcional (busca parcial por nome)
+    // buscas auxiliares comuns
     List<Empresa> findByNomeContainingIgnoreCase(String nome);
+
+    // se sua entidade tiver estes campos (costuma ter):
+    boolean existsByEmail(String email);
+    boolean existsByCnpj(String cnpj);
 }

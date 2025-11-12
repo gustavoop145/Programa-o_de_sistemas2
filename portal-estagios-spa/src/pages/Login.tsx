@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
-import { jwtDecode } from "jwt-decode"; // ✅ named export
+import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
 
 type JwtPayload = {
   sub?: string;
   roles?: string[];
   authorities?: string[];
-  scope?: string; // às vezes vem como "ROLE_X ROLE_Y"
+  scope?: string;
   claims?: { roles?: string[] };
   exp?: number;
 };
@@ -27,16 +27,15 @@ export default function Login() {
     setErr(null);
     setLoading(true);
     try {
-      // backend pode retornar { accessToken, tokenType, ... } OU { token: "..." }
       const { data } = await api.post("/auth/login", { email, senha });
       const token: string = data?.accessToken || data?.token || data?.jwt || "";
 
       if (!token) throw new Error("Resposta sem token.");
 
-      // salva padronizado para o interceptor do axios
+      // salva o token
       localStorage.setItem("accessToken", token);
 
-      // tenta extrair roles de diferentes formatos
+      // extrai roles de várias possíveis estruturas
       const decoded = jwtDecode<JwtPayload>(token);
       let roles: string[] =
         decoded?.roles ||
@@ -47,13 +46,12 @@ export default function Login() {
 
       // normaliza para "ROLE_XXX"
       roles = roles.map((r) => (r.startsWith("ROLE_") ? r : `ROLE_${r}`));
-
-      // (opcional) deixar disponível pro PrivateRoute se ele ler de localStorage
       localStorage.setItem("roles", JSON.stringify(roles));
 
+      // atualiza contexto
       setAuth({ token, roles });
 
-      // navegação: manda para /admin se tiver ROLE_ADMIN, senão outros
+      // navegação automática conforme papel
       if (roles.includes("ROLE_ADMIN")) {
         nav("/admin", { replace: true });
       } else if (roles.includes("ROLE_EMPRESA")) {

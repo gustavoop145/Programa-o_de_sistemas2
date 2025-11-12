@@ -4,14 +4,14 @@ const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8081";
 
 export const api = axios.create({ baseURL });
 
-// manda o token
+// adiciona token JWT nas requisições
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("accessToken");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// se o token expirar ou não tiver permissão, manda pro login
+// trata erros de autenticação
 api.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -19,10 +19,7 @@ api.interceptors.response.use(
     if (status === 401 || status === 403) {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("roles");
-      // evita loop se já estiver no /login
-      if (!location.pathname.startsWith("/login")) {
-        location.assign("/login");
-      }
+      location.assign("/login");
     }
     return Promise.reject(err);
   }

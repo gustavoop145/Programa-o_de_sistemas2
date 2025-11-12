@@ -1,9 +1,15 @@
+// src/auth/Protected.tsx
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import type { PropsWithChildren } from "react";
 
-export default function Protected({ children, role }: { children: JSX.Element, role?: string }) {
-  const { auth } = useAuth();
-  if (!auth.token) return <Navigate to="/login" replace />;
-  if (role && !auth.roles.includes(role)) return <Navigate to="/" replace />;
-  return children;
+type Props = PropsWithChildren<{ role?: string }>;
+
+export default function Protected({ children, role }: Props) {
+  const { token, roles } = useAuth();
+
+  if (!token) return <Navigate to="/login" replace />;
+  if (role && !roles.includes(role)) return <Navigate to="/" replace />;
+
+  return <>{children}</>;
 }

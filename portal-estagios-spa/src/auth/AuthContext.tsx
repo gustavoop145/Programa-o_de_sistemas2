@@ -1,34 +1,48 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 
-type Auth = { token: string | null; roles: string[] };
-type Ctx = Auth & {
-  setAuth: (a: Auth) => void;
+type Auth = {
+  token: string | null;
+  roles: string[];
+};
+
+type AuthContextType = {
+  token: string | null;
+  roles: string[];
+  setAuth: (auth: Auth) => void;
   logout: () => void;
 };
-const AuthCtx = createContext<Ctx>({ token: null, roles: [], setAuth: () => {}, logout: () => {} });
+
+const AuthCtx = createContext<AuthContextType>({
+  token: null,
+  roles: [],
+  setAuth: () => {},
+  logout: () => {},
+});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
 
-  // carrega do localStorage na primeira montagem
+  // carrega token e roles do localStorage ao iniciar
   useEffect(() => {
-    const t = localStorage.getItem("accessToken");
-    const r = JSON.parse(localStorage.getItem("roles") || "[]");
-    if (t) {
-      // se tiver expirado, ignora
+    const storedToken = localStorage.getItem("accessToken");
+    const storedRoles = JSON.parse(localStorage.getItem("roles") || "[]");
+
+    if (storedToken) {
       try {
-        const { exp }: any = jwtDecode(t);
+        const { exp }: any = jwtDecode(storedToken);
         if (exp && exp * 1000 < Date.now()) {
+          // expirado
           localStorage.removeItem("accessToken");
           localStorage.removeItem("roles");
         } else {
-          setToken(t);
-          setRoles(r);
+          setToken(storedToken);
+          setRoles(storedRoles);
         }
       } catch {
-        /* ignore */
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("roles");
       }
     }
   }, []);
