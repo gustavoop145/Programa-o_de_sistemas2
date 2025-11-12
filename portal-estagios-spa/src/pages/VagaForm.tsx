@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+// src/pages/VagaForm.tsx
+import React, { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listarAreas } from "../api/areas";
@@ -16,7 +17,7 @@ type FormData = {
   empresaId: number | string;
 };
 
-export default function VagaForm() {
+export default function VagaForm(): JSX.Element {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const nav = useNavigate();
@@ -146,19 +147,13 @@ export default function VagaForm() {
 
         <label>
           Modalidade
-          <input
-            placeholder="Presencial / Remoto / Híbrido"
-            {...register("modalidade", { required: "Informe a modalidade" })}
-          />
+          <input placeholder="Presencial / Remoto / Híbrido" {...register("modalidade", { required: "Informe a modalidade" })} />
           {errors.modalidade && <small style={{ color: "crimson" }}>{errors.modalidade.message}</small>}
         </label>
 
         <label>
           Localização
-          <input
-            placeholder="Cidade/UF"
-            {...register("localizacao", { required: "Informe a localização" })}
-          />
+          <input placeholder="Cidade/UF" {...register("localizacao", { required: "Informe a localização" })} />
           {errors.localizacao && <small style={{ color: "crimson" }}>{errors.localizacao.message}</small>}
         </label>
 
@@ -183,7 +178,9 @@ export default function VagaForm() {
           <button type="submit" disabled={mSalvar.isPending}>
             {mSalvar.isPending ? "Salvando..." : "Salvar"}
           </button>
-          <button type="button" onClick={() => nav("/vagas")}>Cancelar</button>
+          <button type="button" onClick={() => nav("/vagas")}>
+            Cancelar
+          </button>
         </div>
       </form>
     </div>

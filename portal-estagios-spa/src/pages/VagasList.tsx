@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+// src/pages/VagasList.tsx
+import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { encerrarVaga, listarVagas, deletarVaga } from "../api/vagas";
 import { listarAreas } from "../api/areas";
 import { Link } from "react-router-dom";
 
+/* ---- tipos auxiliares ---- */
 type Area = { id: number; nome: string };
 
 type VagaRow = {
@@ -28,7 +30,7 @@ type PageOf<T> = {
   last: boolean;
 };
 
-export default function VagasList() {
+export default function VagasList(): JSX.Element {
   const qc = useQueryClient();
 
   const [filtros, setFiltros] = useState({
@@ -40,11 +42,13 @@ export default function VagasList() {
     size: 10,
   });
 
+  /* ÁREAS ------------------------------------------------ */
   const { data: areas } = useQuery<Area[]>({
     queryKey: ["areas"],
     queryFn: listarAreas,
   });
 
+  /* VAGAS (paginado) ------------------------------------ */
   const { data, isLoading } = useQuery<PageOf<VagaRow>>({
     queryKey: ["vagas", filtros],
     queryFn: async () =>
@@ -56,14 +60,16 @@ export default function VagasList() {
         localizacao: filtros.localizacao || undefined,
         abertas: filtros.abertas === "true",
       }),
-    placeholderData: (prev) => prev,
+    placeholderData: (prev) => prev as any,
   });
 
+  /* empresaId temporário (depois virá do token JWT) ------ */
   const empresaId = useMemo(() => {
     const s = localStorage.getItem("empresaId");
-    return s ? Number(s) : 1;
+    return s ? Number(s) : undefined;
   }, []);
 
+  /* MUTATIONS ------------------------------------------- */
   const mEncerrar = useMutation({
     mutationFn: (id: number) => encerrarVaga(id, empresaId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["vagas"] }),
@@ -74,15 +80,14 @@ export default function VagasList() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["vagas"] }),
   });
 
+  /* RENDER ---------------------------------------------- */
   return (
     <div className="container" style={{ maxWidth: 900, margin: "0 auto" }}>
       <h1>Vagas</h1>
 
+      {/* FILTROS */}
       <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr 1fr 1fr auto" }}>
-        <select
-          value={filtros.areaId}
-          onChange={(e) => setFiltros((f) => ({ ...f, areaId: e.target.value }))}
-        >
+        <select value={filtros.areaId} onChange={(e) => setFiltros((f) => ({ ...f, areaId: e.target.value }))}>
           <option value="">Todas as áreas</option>
           {areas?.map((a) => (
             <option key={a.id} value={a.id}>
@@ -103,10 +108,7 @@ export default function VagasList() {
           onChange={(e) => setFiltros((f) => ({ ...f, localizacao: e.target.value }))}
         />
 
-        <select
-          value={filtros.abertas}
-          onChange={(e) => setFiltros((f) => ({ ...f, abertas: e.target.value }))}
-        >
+        <select value={filtros.abertas} onChange={(e) => setFiltros((f) => ({ ...f, abertas: e.target.value }))}>
           <option value="true">Abertas</option>
           <option value="false">Todas</option>
         </select>
@@ -134,8 +136,7 @@ export default function VagasList() {
           </thead>
           <tbody>
             {data?.content?.map((v) => {
-              const areaNome =
-                v?.area && typeof v.area === "object" ? (v.area as Area).nome : String(v?.area ?? "");
+              const areaNome = v?.area && typeof v.area === "object" ? (v.area as Area).nome : String(v?.area ?? "");
               return (
                 <tr key={v.id}>
                   <td>{v.titulo}</td>
@@ -145,10 +146,7 @@ export default function VagasList() {
                   <td>{v.status ?? ""}</td>
                   <td>
                     <Link to={`/vagas/${v.id}/editar`}>Editar</Link>{" "}
-                    <button
-                      onClick={() => mEncerrar.mutate(v.id)}
-                      disabled={v.status === "ENCERRADA" || mEncerrar.isPending}
-                    >
+                    <button onClick={() => mEncerrar.mutate(v.id)} disabled={v.status === "ENCERRADA" || mEncerrar.isPending}>
                       Encerrar
                     </button>{" "}
                     <button
@@ -172,11 +170,9 @@ export default function VagasList() {
         </table>
       )}
 
+      {/* paginação simples */}
       <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-        <button
-          onClick={() => setFiltros((f) => ({ ...f, page: Math.max(0, (data?.number ?? 0) - 1) }))}
-          disabled={!!data?.first}
-        >
+        <button onClick={() => setFiltros((f) => ({ ...f, page: Math.max(0, (data?.number ?? 0) - 1) }))} disabled={!!data?.first}>
           ◀ Anterior
         </button>
 

@@ -1,3 +1,4 @@
+// src/api/vagas.ts
 import { api } from "./client";
 
 /** Página padrão do Spring */
@@ -46,6 +47,13 @@ export type VagaUpdate = {
   empresaId?: number;
 };
 
+function empresaIdFromStorage(): number | undefined {
+  const s = localStorage.getItem("empresaId");
+  if (!s) return undefined;
+  const n = Number(s);
+  return isNaN(n) ? undefined : n;
+}
+
 export async function listarVagas(params?: {
   page?: number;
   size?: number;
@@ -73,13 +81,20 @@ export async function atualizarVaga(id: number, payload: VagaUpdate): Promise<Va
   return data;
 }
 
-export async function deletarVaga(id: number, empresaId: number): Promise<void> {
-  await api.delete(`/api/vagas/${id}`, { params: { empresaId } });
+/**
+ * deletarVaga e encerrarVaga aceitam empresaId opcional.
+ * Se não informado, tentam pegar do localStorage (empresaId salvo por você).
+ */
+export async function deletarVaga(id: number, empresaId?: number): Promise<void> {
+  const empresa = empresaId ?? empresaIdFromStorage();
+  const params = empresa ? { params: { empresaId: empresa } } : {};
+  await api.delete(`/api/vagas/${id}`, params);
 }
 
-export async function encerrarVaga(id: number, empresaId: number): Promise<Vaga> {
+export async function encerrarVaga(id: number, empresaId?: number): Promise<Vaga> {
+  const empresa = empresaId ?? empresaIdFromStorage();
   const { data } = await api.patch<Vaga>(`/api/vagas/${id}/encerrar`, null, {
-    params: { empresaId },
+    params: empresa ? { empresaId: empresa } : {},
   });
   return data;
 }

@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import EstudanteHome from "./pages/EstudanteHome";
 import EmpresaHome from "./pages/EmpresaHome";
 import AdminDashboard from "./pages/AdminDashboard";
+import MinhasInscricoes from "./pages/MinhasInscricoes";
 
 // CRUD de Vagas (EMPRESA)
 import VagasList from "./pages/VagasList";
@@ -76,6 +77,15 @@ export default function App() {
               element={
                 <Protected role="ROLE_ADMIN">
                   <AdminDashboard />
+                </Protected>
+              }
+            />
+
+            <Route
+              path="/inscricoes"
+              element={
+                <Protected role="ROLE_ESTUDANTE">
+                  <MinhasInscricoes />
                 </Protected>
               }
             />
