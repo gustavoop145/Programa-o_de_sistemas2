@@ -1,18 +1,16 @@
 package com.portalestagios.service;
 
-import com.portalestagios.dto.MapperUtils;
 import com.portalestagios.dto.vaga.VagaCreateDTO;
 import com.portalestagios.dto.vaga.VagaResponseDTO;
 import com.portalestagios.dto.vaga.VagaUpdateDTO;
-import com.portalestagios.entity.AreaInteresse;
-import com.portalestagios.entity.Empresa;
-import com.portalestagios.entity.Vaga;
-import com.portalestagios.entity.Estudante;
+import com.portalestagios.entity.*;
 import com.portalestagios.entity.enums.StatusVaga;
 import com.portalestagios.repository.AreaInteresseRepository;
 import com.portalestagios.repository.EmpresaRepository;
 import com.portalestagios.repository.EstudanteRepository;
 import com.portalestagios.repository.VagaRepository;
+import com.portalestagios.util.MapperUtils;
+
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.*;
@@ -40,10 +38,9 @@ public class VagaService {
         this.estudanteRepository = estudanteRepository;
     }
 
+    // agora recebe a Empresa (obtida do token) em vez de empresaId
     @Transactional
-    public VagaResponseDTO create(@Valid VagaCreateDTO dto) {
-        Empresa empresa = empresaRepository.findById(dto.empresaId())
-                .orElseThrow(() -> new EntityNotFoundException("Empresa não encontrada: " + dto.empresaId()));
+    public VagaResponseDTO create(@Valid VagaCreateDTO dto, Empresa empresa) {
         AreaInteresse area = areaRepository.findById(dto.areaId())
                 .orElseThrow(() -> new EntityNotFoundException("Área não encontrada: " + dto.areaId()));
 
@@ -70,7 +67,6 @@ public class VagaService {
                                       String localizacao,
                                       Boolean abertas) {
 
-        // Exemplo simples: usar Specification se quiser filtros avançados.
         Vaga probe = new Vaga();
         if (localizacao != null && !localizacao.isBlank()) {
             probe.setLocalizacao(localizacao);
@@ -113,15 +109,16 @@ public class VagaService {
 
     @Transactional(readOnly = true)
     public List<VagaResponseDTO> recomendadas(Long estudanteId, int limit) {
-        Estudante estudante = estudanteRepository.findById(estudanteId)
+        var estudante = estudanteRepository.findById(estudanteId)
                 .orElseThrow(() -> new EntityNotFoundException("Estudante não encontrado: " + estudanteId));
 
         List<Long> areaIds = estudante.getAreas() == null
                 ? Collections.emptyList()
                 : estudante.getAreas().stream().map(AreaInteresse::getId).toList();
 
-        Pageable topN = PageRequest.of(0, Math.max(1, limit), Sort.by(Sort.Direction.DESC, "id"));
         Page<Vaga> page;
+        Pageable topN = PageRequest.of(0, Math.max(1, limit), Sort.by(Sort.Direction.DESC, "id"));
+
         if (!areaIds.isEmpty()) {
             page = vagaRepository.findByStatusAndArea_IdIn(StatusVaga.ABERTA, areaIds, topN);
         } else {

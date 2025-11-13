@@ -3,7 +3,9 @@ package com.portalestagios.controller;
 import com.portalestagios.dto.vaga.VagaCreateDTO;
 import com.portalestagios.dto.vaga.VagaResponseDTO;
 import com.portalestagios.dto.vaga.VagaUpdateDTO;
+import com.portalestagios.entity.Empresa;
 import com.portalestagios.service.VagaService;
+import com.portalestagios.repository.EmpresaRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -11,6 +13,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,9 +24,11 @@ import java.util.List;
 public class VagaController {
 
     private final VagaService vagaService;
+    private final EmpresaRepository empresaRepository;
 
-    public VagaController(VagaService vagaService) {
+    public VagaController(VagaService vagaService, EmpresaRepository empresaRepository) {
         this.vagaService = vagaService;
+        this.empresaRepository = empresaRepository;
     }
 
     @Operation(summary = "Listar vagas (pública, com filtros)")
@@ -52,8 +57,14 @@ public class VagaController {
     @Operation(summary = "Criar vaga (empresa)")
     @PreAuthorize("hasRole('EMPRESA')")
     @PostMapping
-    public ResponseEntity<VagaResponseDTO> create(@Valid @RequestBody VagaCreateDTO dto) {
-        return ResponseEntity.ok(vagaService.create(dto));
+    public ResponseEntity<VagaResponseDTO> create(@Valid @RequestBody VagaCreateDTO dto,
+                                                  Authentication auth) {
+        // pega empresa pelo email do usuário logado
+        String email = auth != null ? auth.getName() : null;
+        Empresa empresa = empresaRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new IllegalArgumentException("Empresa do token não encontrada: " + email));
+
+        return ResponseEntity.ok(vagaService.create(dto, empresa));
     }
 
     @Operation(summary = "Atualizar vaga (empresa dona)")
@@ -61,24 +72,34 @@ public class VagaController {
     @PutMapping("/{id}")
     public ResponseEntity<VagaResponseDTO> update(@PathVariable Long id,
                                                   @Valid @RequestBody VagaUpdateDTO dto,
-                                                  @RequestParam Long empresaId) {
-        return ResponseEntity.ok(vagaService.update(id, dto, empresaId));
+                                                  Authentication auth) {
+        String email = auth != null ? auth.getName() : null;
+        Empresa empresa = empresaRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new IllegalArgumentException("Empresa do token não encontrada: " + email));
+
+        return ResponseEntity.ok(vagaService.update(id, dto, empresa.getId()));
     }
 
     @Operation(summary = "Remover vaga (empresa dona)")
     @PreAuthorize("hasRole('EMPRESA')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id,
-                                       @RequestParam Long empresaId) {
-        vagaService.delete(id, empresaId);
+    public ResponseEntity<Void> delete(@PathVariable Long id, Authentication auth) {
+        String email = auth != null ? auth.getName() : null;
+        Empresa empresa = empresaRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new IllegalArgumentException("Empresa do token não encontrada: " + email));
+
+        vagaService.delete(id, empresa.getId());
         return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Encerrar vaga (empresa dona)")
     @PreAuthorize("hasRole('EMPRESA')")
     @PatchMapping("/{id}/encerrar")
-    public ResponseEntity<VagaResponseDTO> encerrar(@PathVariable Long id,
-                                                    @RequestParam Long empresaId) {
-        return ResponseEntity.ok(vagaService.encerrar(id, empresaId));
+    public ResponseEntity<VagaResponseDTO> encerrar(@PathVariable Long id, Authentication auth) {
+        String email = auth != null ? auth.getName() : null;
+        Empresa empresa = empresaRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new IllegalArgumentException("Empresa do token não encontrada: " + email));
+
+        return ResponseEntity.ok(vagaService.encerrar(id, empresa.getId()));
     }
 }

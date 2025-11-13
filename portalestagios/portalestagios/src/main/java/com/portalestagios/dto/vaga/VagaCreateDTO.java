@@ -1,4 +1,3 @@
-// src/main/java/com/portalestagios/dto/vaga/VagaCreateDTO.java
 package com.portalestagios.dto.vaga;
 
 import com.portalestagios.entity.enums.Modalidade;
@@ -14,4 +13,5 @@ public record VagaCreateDTO(
         @NotNull  @Schema(example = "REMOTO") Modalidade modalidade,
         @NotNull  @Min(10) @Max(40) @Schema(example = "30") Integer cargaHoraria,
         @NotBlank @Schema(example = "React, CSS, Git") String requisitos
+        // removido: empresaId (agora será obtido do token)
 ) {}
